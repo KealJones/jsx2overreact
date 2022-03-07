@@ -4,8 +4,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: denoland/setup-deno@v1
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          path: main
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
         with:
           deno-version: v1.x
-      - run: deno test
-        name: 'Run Tests'
+      - name: Run Tests
+        run: deno test
