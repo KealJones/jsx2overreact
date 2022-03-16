@@ -6,7 +6,6 @@ const assertStringEqual = (actual: string, expected: string) =>
   assertEquals(dedent(actual), dedent(expected));
 
 await Deno.test("jsx2OverReact", async (t) => {
-
   await t.step("wraps text nodes in single quotes", () => {
     const jsxInput = `hello world`;
     assertStringEqual(
@@ -35,17 +34,20 @@ await Deno.test("jsx2OverReact", async (t) => {
     );
   });
 
-  await t.step("wraps OverReact factory and has cascade setters when there are properties", () => {
-    const jsxInput = `<HelloWorld omg="lol">hello world</HelloWorld>`;
-    assertStringEqual(
-      jsx2OverReact(jsxInput),
-      `(HelloWorld()
+  await t.step(
+    "wraps OverReact factory and has cascade setters when there are properties",
+    () => {
+      const jsxInput = `<HelloWorld omg="lol">hello world</HelloWorld>`;
+      assertStringEqual(
+        jsx2OverReact(jsxInput),
+        `(HelloWorld()
         ..omg = 'lol'
       )(
         'hello world'
       )`,
-    );
-  });
+      );
+    },
+  );
 
   await t.step('"Dartifies" JSX props', async (t) => {
     const makeJsxPropertyValueString = (value: string) =>
