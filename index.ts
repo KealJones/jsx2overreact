@@ -95,10 +95,10 @@ function convertExpression(
     | JSXEmptyExpression
     | AssignmentPattern
     | BindingPattern,
-): string {
+  depth = 0): string {
   switch (expression?.type) {
     case "JSXElement":
-      return convertJSXChild(expression);
+      return convertJSXChild(expression, depth);
     case "Identifier":
       return expression.name;
     case "Literal":
@@ -106,7 +106,7 @@ function convertExpression(
     case "ObjectExpression":
       return convertObjectExpression(expression);
     case "JSXExpressionContainer":
-      return convertExpression(expression.expression);
+      return convertExpression(expression.expression, depth);
     default:
       return `EXPRESSION IDK: ${JSON.stringify(expression)}`;
   }
@@ -132,38 +132,46 @@ function convertObjectLiteralElementLike(prop: ObjectLiteralElementLike) {
   }
 }
 
-function convertJSXChild(el: JSXChild): string {
+function convertJSXChild(el: JSXChild, depth = 0): string {
   let output = "";
   switch (el.type) {
     case "JSXElement": {
-      const hasAttributes = el.openingElement.attributes.length > 0;
+      const hasProps = el.openingElement.attributes.length > 0;
       const hasChildren = el.children.length > 0;
-      if (el.openingElement) {
-        output += `${hasAttributes ? "(" : ""}${
-          convertElementName(el.openingElement.name)
-        }()`;
-        if (hasAttributes) {
-          for (const attribute of el.openingElement.attributes) {
-            output += convertJSXAttribute(attribute);
-          }
+      let childCount = 0;
+
+      output += `${indent.repeat(depth)}${hasProps ? "(" : ""}${
+        convertElementName(el.openingElement.name)
+      }()${hasProps ? '\n' : ''}`;
+      if (hasProps) {
+        for (const attribute of el.openingElement.attributes) {
+          output += `${indent.repeat(depth+1)}${convertJSXAttribute(attribute, depth+1)}\n`;
         }
-        output += `${hasAttributes ? ")" : ""}(${hasChildren ? "\n" : "),"}`;
       }
       if (hasChildren) {
+        childCount += 1;
+        output += `${hasProps ? indent.repeat(depth) + ")" : ""}(\n`;
         for (const child of el.children) {
-          output += convertJSXChild(child);
+          output += convertJSXChild(child, depth+1) + (el.children.length > 1 ? ',\n' : '');
         }
-        output += "),\n";
+        output += indent.repeat(depth) + ")";
+      } else if (hasProps) {
+        output += indent.repeat(depth) + ')()';
+      } else {
+        output += '()';
       }
-      // } else {
-      //   output += '(),';
-      // }
-
+      if (el.children && childCount < el.children.length) {
+        output += ',\n';
+      }
       break;
     }
-    case "JSXText":
-      output += cleanString(el.value);
+    case "JSXText": {
+      const cleanedString =cleanString(el.value);
+      if (cleanedString != '') {
+         output += indent.repeat(depth) + cleanedString + '\n';
+      }
       break;
+    }
     default:
       break;
   }
@@ -179,7 +187,7 @@ function cleanString(str: string): string {
   }
 }
 
-function convertJSXAttributeValue(value: JSXAttributeValue): string {
+function convertJSXAttributeValue(value: JSXAttributeValue, depth = 0): string {
   if (value == null) return "null";
   switch (value.type) {
     case "Literal":
@@ -190,16 +198,16 @@ function convertJSXAttributeValue(value: JSXAttributeValue): string {
     case "JSXElement":
     case "JSXExpressionContainer":
     case "JSXFragment":
-      return `(${convertExpression(value)})`;
+      return `(${convertExpression(value, depth)})`;
   }
   return `${value}`;
 }
 
-function convertJSXAttribute(attr: JSXAttribute | JSXSpreadAttribute): string {
+function convertJSXAttribute(attr: JSXAttribute | JSXSpreadAttribute, depth = 0): string {
   switch (attr.type) {
     case "JSXAttribute":
-      return `\n..${convertName(attr.name.name)} = ${
-        convertJSXAttributeValue(attr.value)
+      return `..${convertName(attr.name.name)} = ${
+        convertJSXAttributeValue(attr.value, depth)
       }`;
     default:
       return "";
