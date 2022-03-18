@@ -152,7 +152,10 @@ function convertJSXChild(el: JSXChild, depth = 0): string {
         childCount += 1;
         output += `${hasProps ? indent.repeat(depth) + ")" : ""}(\n`;
         for (const child of el.children) {
-          output += convertJSXChild(child, depth+1) + (el.children.length > 1 ? ',\n' : '');
+          let kid = convertJSXChild(child, depth+1);
+          if (kid) {
+            output += kid + (el.children.length > 1 ? ',\n' : '');
+          }
         }
         output += indent.repeat(depth) + ")";
       } else if (hasProps) {
@@ -161,13 +164,13 @@ function convertJSXChild(el: JSXChild, depth = 0): string {
         output += '()';
       }
       if (el.children && childCount < el.children.length) {
-        output += ',\n';
+        //output += ',\n';
       }
       break;
     }
     case "JSXText": {
-      const cleanedString =cleanString(el.value);
-      if (cleanedString != '') {
+      const cleanedString = cleanString(el.value);
+      if (cleanedString != '' && cleanedString != '\n') {
          output += indent.repeat(depth) + cleanedString + '\n';
       }
       break;
@@ -179,11 +182,11 @@ function convertJSXChild(el: JSXChild, depth = 0): string {
 }
 
 function cleanString(str: string): string {
-  const trimmedString = str.trim();
+  const trimmedString = str.trim().replace(/(\r\n|\n|\r)/gm, "");
   if (trimmedString == "") {
     return "";
   } else {
-    return `'${trimmedString.replaceAll("'", "\\'")}'`;
+    return `'${str.replaceAll("'", "\\'")}'`;
   }
 }
 
