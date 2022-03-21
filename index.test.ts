@@ -7,10 +7,11 @@ const assertStringEqual = (actual: string, expected: string) =>
 
 await Deno.test("jsx2OverReact", async (t) => {
   await t.step("wraps text nodes in single quotes", () => {
-    const jsxInput = `hello world`;
+    const jsxString = `hello world`;
+
     assertStringEqual(
-      jsx2OverReact(jsxInput),
-      "'" + jsxInput + "'",
+      jsx2OverReact('("' + jsxString + '")'),
+      "'" + jsxString + "'",
     );
   });
 
@@ -186,81 +187,87 @@ await Deno.test("jsx2OverReact", async (t) => {
       assertStringEqual(
         jsx2OverReact(jsxInput),
       `(List()
-        ..sx = {'width': '100%', 'maxWidth': 360, 'bgcolor': 'background.paper'}
+      ..sx = {'width':'100%','maxWidth':360,'bgcolor':'background.paper'}
+    )(
+      (ListItem()
+        ..alignItems = 'flex-start'
       )(
-        (ListItem()..alignItems = 'flex-start')(
-          ListItemAvatar()(
-            (Avatar()
-              ..hasSomething = true
-              ..alt = 'Remy Sharp'
-              ..src = '/static/images/avatar/1.jpg'
-            )(),
-          ),
-          (ListItemText()
-            ..primary = 'Brunch this weekend?'
-            ..secondary = Fragment()(
-              (Typography()
-                ..sx = {'display': 'inline'}
-                ..component = 'span'
-                ..variant = 'body2'
-                ..color = 'text.primary'
-              )(
-                'Ali Connors',
-              ),
-            )
-          )(),
+        ListItemAvatar()(
+          (Avatar()
+            ..hasSomething = true
+            ..alt = 'Remy Sharp'
+            ..src = '/static/images/avatar/1.jpg'
+          )()
         ),
-        (Divider()
-          ..variant = 'inset'
-          ..component = 'li'
+        (ListItemText()
+          ..primary = 'Brunch this weekend?'
+          ..secondary = Fragment()(
+            (Typography()
+              ..sx = {'display':'inline'}
+              ..component = 'span'
+              ..variant = 'body2'
+              ..color = 'text.primary'
+            )(
+              'Ali Connors'
+            )
+          )
         )(),
-        (ListItem()..alignItems = 'flex-start')(
-          ListItemAvatar()(
-            (Avatar()
-              ..alt = 'Travis Howard'
-              ..src = '/static/images/avatar/2.jpg'
-            )(),
-          ),
-          (ListItemText()
-            ..primary = 'Summer BBQ'
-            ..secondary = Fragment()(
-              (Typography()
-                ..sx = {'display': 'inline'}
-                ..component = 'span'
-                ..variant = 'body2'
-                ..color = 'text.primary'
-              )(
-                'to Scott, Alex, Jennifer',
-              ),
-            )
-          )(),
+      ),
+      (Divider()
+        ..variant = 'inset'
+        ..component = 'li'
+      )(),
+      (ListItem()
+        ..alignItems = 'flex-start'
+      )(
+        ListItemAvatar()(
+          (Avatar()
+            ..alt = 'Travis Howard'
+            ..src = '/static/images/avatar/2.jpg'
+          )()
         ),
-        (Divider()
-          ..variant = 'inset'
-          ..component = 'li'
+        (ListItemText()
+          ..primary = 'Summer BBQ'
+          ..secondary = Fragment()(
+            (Typography()
+              ..sx = {'display':'inline'}
+              ..component = 'span'
+              ..variant = 'body2'
+              ..color = 'text.primary'
+            )(
+              'to Scott, Alex, Jennifer'
+            )
+          )
         )(),
-        (ListItem()..alignItems = 'flex-start')(
-          ListItemAvatar()(
-            (Avatar()
-              ..alt = 'Cindy Baker'
-              ..src = '/static/images/avatar/3.jpg'
-            )(),
-          ),
-          (ListItemText()
-            ..primary = 'Oui Oui'
-            ..secondary = Fragment()(
-              (Typography()
-                ..sx = {'display': 'inline'}
-                ..component = 'span'
-                ..variant = 'body2'
-                ..color = 'text.primary'
-              )(
-                'Sandra Adams',
-              ),
-            )
-          )(),
+      ),
+      (Divider()
+        ..variant = 'inset'
+        ..component = 'li'
+      )(),
+      (ListItem()
+        ..alignItems = 'flex-start'
+      )(
+        ListItemAvatar()(
+          (Avatar()
+            ..alt = 'Cindy Baker'
+            ..src = '/static/images/avatar/3.jpg'
+          )()
         ),
-      ),`,
+        (ListItemText()
+          ..primary = 'Oui Oui'
+          ..secondary = Fragment()(
+            (Typography()
+              ..sx = {'display':'inline'}
+              ..component = 'span'
+              ..variant = 'body2'
+              ..color = 'text.primary'
+            )(
+              'Sandra Adams'
+            )
+          )
+        )(),
+      ),
+    ),`,
       );
     });
   });

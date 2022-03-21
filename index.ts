@@ -3,8 +3,6 @@ import {
   AssignmentPattern,
   BindingPattern,
   Expression,
-  ExpressionStatement,
-  Identifier,
   JSXAttribute,
   JSXAttributeValue,
   JSXChild,
@@ -98,6 +96,7 @@ function convertExpression(
   depth = 0): string {
   switch (expression?.type) {
     case "JSXElement":
+    case "JSXFragment":
       return convertJSXChild(expression, depth);
     case "Identifier":
       return expression.name;
@@ -147,17 +146,23 @@ function convertObjectLiteralElementLike(prop: ObjectLiteralElementLike) {
 function convertJSXChild(el: JSXChild, depth = 0): string {
   let output = "";
   switch (el.type) {
-    case "JSXElement": {
-      const hasProps = el.openingElement.attributes.length > 0;
+    case "JSXElement":
+    case "JSXFragment": {
+      const openingElement = {
+        name: convertElementName(el.type == 'JSXFragment' ? 'Fragment' : el.openingElement.name),
+        children: el.children,
+        attributes: el.type == 'JSXElement' ? el.openingElement.attributes : [],
+      };
+      const hasProps = openingElement.attributes.length > 0;
       const hasChildren = el.children.length > 0;
       let childCount = 0;
       let convertedKids = [];
 
       output += `${indent.repeat(depth)}${hasProps ? "(" : ""}${
-        convertElementName(el.openingElement.name)
+       openingElement.name
       }()${hasProps ? '\n' : ''}`;
       if (hasProps) {
-        for (const attribute of el.openingElement.attributes) {
+        for (const attribute of openingElement.attributes) {
           const attributeString = `${indent.repeat(depth+1)}${convertJSXAttribute(attribute, depth+1)}\n`;
           output += attributeString.replace(/= {2,}/g, '= ');
         }
