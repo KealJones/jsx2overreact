@@ -8,7 +8,6 @@ const assertStringEqual = (actual: string, expected: string) =>
 await Deno.test("jsx2OverReact", async (t) => {
   await t.step("wraps text nodes in single quotes", () => {
     const jsxString = `hello world`;
-
     assertStringEqual(
       jsx2OverReact('("' + jsxString + '")'),
       "'" + jsxString + "'",
@@ -32,6 +31,14 @@ await Deno.test("jsx2OverReact", async (t) => {
       `HelloWorld()(
         'hello world'
       )`,
+    );
+  });
+
+  await t.step("converts jsx fragments", () => {
+    const jsxInput = `<></>`;
+    assertStringEqual(
+      jsx2OverReact(jsxInput),
+      'Fragment()()',
     );
   });
 
