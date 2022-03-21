@@ -24,11 +24,11 @@ const indent = "  ";
 
 export function jsx2OverReact(str: string): string {
   const parsedJsx = parseScript(str, { jsx: true });
-  console.log(JSON.stringify(parsedJsx, null, 2));
+  //console.log(JSON.stringify(parsedJsx, null, 2));
   return jsxToOverReactString(parsedJsx);
 }
 
-function jsxToOverReactString(program: Program, depth = 0): string {
+function jsxToOverReactString(program: Program): string {
   let output = "";
   for (const statement of program.body) {
     output += convertStatement(statement);
@@ -102,6 +102,9 @@ function convertExpression(
     case "Identifier":
       return expression.name;
     case "Literal":
+      if (typeof expression.value == 'string') {
+        return `'${expression.value}'`;
+      }
       return `${expression.value}`;
     case "ObjectExpression":
       return convertObjectExpression(expression);
@@ -114,19 +117,28 @@ function convertExpression(
 
 function convertObjectExpression(obj: ObjectExpression): string {
   let output = "{";
+  let count = 0;
   for (const prop of obj.properties) {
+    count++;
     output += convertObjectLiteralElementLike(prop);
+    if (count < obj.properties.length){
+      output += ',\n';
+    }
   }
   output += "}";
-  return output;
+  return formatValue(output);
+}
+
+function formatValue(val: string) {
+  return JSON.stringify(eval("("+val+")")).replaceAll('"', "'");
 }
 
 function convertObjectLiteralElementLike(prop: ObjectLiteralElementLike) {
   switch (prop.type) {
     case "Property":
-      return `'${convertExpression(prop.key)}': '${
+      return `'${convertExpression(prop.key)}': ${
         convertExpression(prop.value)
-      }',`;
+      }`;
     case "SpreadElement":
       return `..addAll(${prop.argument})`;
   }
@@ -139,23 +151,23 @@ function convertJSXChild(el: JSXChild, depth = 0): string {
       const hasProps = el.openingElement.attributes.length > 0;
       const hasChildren = el.children.length > 0;
       let childCount = 0;
+      let convertedKids = [];
 
       output += `${indent.repeat(depth)}${hasProps ? "(" : ""}${
         convertElementName(el.openingElement.name)
       }()${hasProps ? '\n' : ''}`;
       if (hasProps) {
         for (const attribute of el.openingElement.attributes) {
-          output += `${indent.repeat(depth+1)}${convertJSXAttribute(attribute, depth+1)}\n`;
+          const attributeString = `${indent.repeat(depth+1)}${convertJSXAttribute(attribute, depth+1)}\n`;
+          output += attributeString.replace(/= {2,}/g, '= ');
         }
       }
       if (hasChildren) {
         childCount += 1;
         output += `${hasProps ? indent.repeat(depth) + ")" : ""}(\n`;
-        for (const child of el.children) {
-          let kid = convertJSXChild(child, depth+1);
-          if (kid) {
-            output += kid + (el.children.length > 1 ? ',\n' : '');
-          }
+        convertedKids = el.children.map((child) => convertJSXChild(child, depth+1)).filter((child)=> child != '');
+        for (const child of convertedKids) {
+          output += child + (convertedKids.length > 1 ? ',\n' : '');
         }
         output += indent.repeat(depth) + ")";
       } else if (hasProps) {
@@ -163,8 +175,8 @@ function convertJSXChild(el: JSXChild, depth = 0): string {
       } else {
         output += '()';
       }
-      if (el.children && childCount < el.children.length) {
-        //output += ',\n';
+      if (hasChildren && childCount < convertedKids.length) {
+        output += ',\n';
       }
       break;
     }
@@ -178,15 +190,15 @@ function convertJSXChild(el: JSXChild, depth = 0): string {
     default:
       break;
   }
-  return output;
+  return output.replace(/\)( {2,})\)/g, ')\n$1)').replace(/^,(\r\n|\n|\r)/gm, "");
 }
 
 function cleanString(str: string): string {
-  const trimmedString = str.trim().replace(/(\r\n|\n|\r)/gm, "");
-  if (trimmedString == "") {
+  const trimmedString = str.trim();
+  if (trimmedString.replace(/(\r\n|\n|\r)/gm, "") == "") {
     return "";
   } else {
-    return `'${str.replaceAll("'", "\\'")}'`;
+    return `'${trimmedString.replaceAll("'", "\\'")}'`;
   }
 }
 
@@ -201,7 +213,7 @@ function convertJSXAttributeValue(value: JSXAttributeValue, depth = 0): string {
     case "JSXElement":
     case "JSXExpressionContainer":
     case "JSXFragment":
-      return `(${convertExpression(value, depth)})`;
+      return `${convertExpression(value, depth)}`;
   }
   return `${value}`;
 }
@@ -245,6 +257,7 @@ function convertName(
   return `${name}`;
 }
 
+// deno-lint-ignore no-explicit-any
 function isString(value: any): value is string {
   return typeof value === "string" || value instanceof String;
 }
