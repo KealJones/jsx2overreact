@@ -1,20 +1,4 @@
-import { parseScript } from "https://cdn.skypack.dev/meriyah?dts";
-import {
-  AssignmentPattern,
-  BindingPattern,
-  Expression,
-  JSXAttribute,
-  JSXAttributeValue,
-  JSXChild,
-  JSXEmptyExpression,
-  JSXIdentifier,
-  JSXSpreadAttribute,
-  JSXTagNameExpression,
-  ObjectExpression,
-  ObjectLiteralElementLike,
-  Program,
-  Statement,
-} from "https://cdn.skypack.dev/-/meriyah@v4.2.0-67KG0fIEEKBG4CkNhcI8/dist=es2019,mode=types/dist/src/estree";
+import { parseScript, ESTree } from "https://esm.sh/meriyah@4.2.1";
 
 // Unrelated but kind dope (found while building this): https://jsonformatter.org/json-to-dart
 
@@ -26,7 +10,7 @@ export function jsx2OverReact(str: string): string {
   return jsxToOverReactString(parsedJsx);
 }
 
-function jsxToOverReactString(program: Program): string {
+function jsxToOverReactString(program: ESTree.Program): string {
   let output = "";
   for (const statement of program.body) {
     output += convertStatement(statement);
@@ -74,7 +58,7 @@ type JSXElement = {
   nodeValue?: string;
 };
 
-function convertStatement(statement: Statement): string {
+function convertStatement(statement: ESTree.Statement): string {
   let output = "";
   switch (statement.type) {
     case "ExpressionStatement": {
@@ -89,10 +73,10 @@ function convertStatement(statement: Statement): string {
 
 function convertExpression(
   expression?:
-    | Expression
-    | JSXEmptyExpression
-    | AssignmentPattern
-    | BindingPattern,
+    | ESTree.Expression
+    | ESTree.JSXEmptyExpression
+    | ESTree.AssignmentPattern
+    | ESTree.BindingPattern,
   depth = 0): string {
   switch (expression?.type) {
     case "JSXElement":
@@ -114,7 +98,7 @@ function convertExpression(
   }
 }
 
-function convertObjectExpression(obj: ObjectExpression): string {
+function convertObjectExpression(obj: ESTree.ObjectExpression): string {
   let output = "{";
   let count = 0;
   for (const prop of obj.properties) {
@@ -129,10 +113,10 @@ function convertObjectExpression(obj: ObjectExpression): string {
 }
 
 function formatValue(val: string) {
-  return JSON.stringify(eval("("+val+")")).replaceAll('"', "'");
+  return JSON.stringify(val).replaceAll('"', "'");
 }
 
-function convertObjectLiteralElementLike(prop: ObjectLiteralElementLike) {
+function convertObjectLiteralElementLike(prop: ESTree.ObjectLiteralElementLike) {
   switch (prop.type) {
     case "Property":
       return `'${convertExpression(prop.key)}': ${
@@ -143,7 +127,7 @@ function convertObjectLiteralElementLike(prop: ObjectLiteralElementLike) {
   }
 }
 
-function convertJSXChild(el: JSXChild, depth = 0): string {
+function convertJSXChild(el: ESTree.JSXChild, depth = 0): string {
   let output = "";
   switch (el.type) {
     case "JSXElement":
@@ -156,7 +140,8 @@ function convertJSXChild(el: JSXChild, depth = 0): string {
       const hasProps = openingElement.attributes.length > 0;
       const hasChildren = el.children.length > 0;
       let childCount = 0;
-      let convertedKids = [];
+      // deno-lint-ignore no-explicit-any
+      let convertedKids = <any>[];
 
       output += `${indent.repeat(depth)}${hasProps ? "(" : ""}${
        openingElement.name
@@ -170,7 +155,8 @@ function convertJSXChild(el: JSXChild, depth = 0): string {
       if (hasChildren) {
         childCount += 1;
         output += `${hasProps ? indent.repeat(depth) + ")" : ""}(\n`;
-        convertedKids = el.children.map((child) => convertJSXChild(child, depth+1)).filter((child)=> child != '');
+        // deno-lint-ignore no-explicit-any
+        convertedKids = el.children.map((child: any) => convertJSXChild(child, depth+1)).filter((child: any)=> child != '');
         for (const child of convertedKids) {
           output += child + (convertedKids.length > 1 ? ',\n' : '');
         }
@@ -207,7 +193,7 @@ function cleanString(str: string): string {
   }
 }
 
-function convertJSXAttributeValue(value: JSXAttributeValue, depth = 0): string {
+function convertJSXAttributeValue(value: ESTree.JSXAttributeValue, depth = 0): string {
   if (value == null) return "null";
   switch (value.type) {
     case "Literal":
@@ -223,7 +209,7 @@ function convertJSXAttributeValue(value: JSXAttributeValue, depth = 0): string {
   return `${value}`;
 }
 
-function convertJSXAttribute(attr: JSXAttribute | JSXSpreadAttribute, depth = 0): string {
+function convertJSXAttribute(attr: ESTree.JSXAttribute | ESTree.JSXSpreadAttribute, depth = 0): string {
   switch (attr.type) {
     case "JSXAttribute":
       return `..${convertName(attr.name.name)} = ${
@@ -235,7 +221,7 @@ function convertJSXAttribute(attr: JSXAttribute | JSXSpreadAttribute, depth = 0)
 }
 
 function convertElementName(
-  name: string | JSXIdentifier | JSXTagNameExpression,
+  name: string | ESTree.JSXIdentifier | ESTree.JSXTagNameExpression,
 ): string {
   const convertedName = convertName(name);
   if (startsWithCapital(convertedName)) {
@@ -245,7 +231,7 @@ function convertElementName(
 }
 
 function convertName(
-  name: string | JSXIdentifier | JSXTagNameExpression,
+  name: string | ESTree.JSXIdentifier | ESTree.JSXTagNameExpression,
 ): string {
   if (isString(name)) {
     return name;
