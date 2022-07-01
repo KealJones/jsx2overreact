@@ -11,12 +11,13 @@
       "https://deno.land/x/aleph@1.0.0-alpha.78/types.d.ts"
     ],
     "jsx": "react-jsx",
-    "jsxImportSource": "https://esm.sh/react@18.1.0"
+    "jsxImportSource": "https://esm.sh/react@18.2.0"
   },
   "importMap": "import_map.json",
   "tasks": {
-    "dev": "ALEPH_ENV=development deno run -A server.tsx",
-    "start": "deno run -A server.tsx"
+    "dev": "deno run -A https://deno.land/x/aleph@1.0.0-alpha.78/cli.ts dev",
+    "start": "deno run -A https://deno.land/x/aleph@1.0.0-alpha.78/cli.ts start",
+    "build": "deno run -A https://deno.land/x/aleph@1.0.0-alpha.78/cli.ts build"
   },
   "fmt": {},
   "lint": {}
