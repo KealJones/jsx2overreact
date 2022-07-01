@@ -1,18 +1,8 @@
 name: JSX 2 OverReact
 on: [push]
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup Deno
-        uses: denoland/setup-deno@v1
-        with:
-          deno-version: v1.x
-      - name: Run Tests
-        run: deno test
   deploy:
+    runs-on: ubuntu-latest
     permissions:
       id-token: write # This is required to allow the GitHub Action to authenticate with Deno Deploy.
       contents: read
