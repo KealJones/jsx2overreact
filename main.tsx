@@ -1,4 +1,3 @@
-import { App } from "aleph/react";
-import { hydrateRoot } from "react-dom/client";
+import { bootstrap } from "aleph/react-client";
 
-hydrateRoot(document.querySelector("#root")!, <App />);
+bootstrap();

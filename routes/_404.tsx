@@ -7,7 +7,9 @@ export default function E404() {
         Ooooooops, nothing here!
       </h2>
       <p>
-        <Link to="/">Go back to the homepage</Link>
+        <Link to="/">
+          Go back to the homepage
+        </Link>
       </p>
     </div>
   );
