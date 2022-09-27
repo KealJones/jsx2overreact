@@ -159,9 +159,6 @@ const formatJSXAttribute: Generator["JSXAttribute"] = (
   state,
 ) => {
   state.write("..", node);
-  if (node.name.name == 'SelectProps'){
-    debugger;
-  }
   state.generator[node.name.type](node.name, state);
   state.write(" = ", node);
   if (node.value != null) {
@@ -250,6 +247,7 @@ const customGenerator: Generator = {
   },
   Literal: function (node, state) {
     if (node.raw != null) {
+      debugger;
       // Non-standard property
       state.write(node.raw, node);
     } else if (node.regex != null) {
@@ -271,9 +269,9 @@ const customGenerator: Generator = {
           this[node.key.type](node.key, state)
           state.write(']')
         } else {
-          state.write("'");
+          if (node.key.type == 'Identifier') state.write("'");
           this[node.key.type](node.key, state)
-          state.write("'");
+          if (node.key.type == 'Identifier') state.write("'");
         }
         state.write(': ')
       }
