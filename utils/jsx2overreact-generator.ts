@@ -280,22 +280,16 @@ const customGenerator: Generator = {
   },
   ObjectExpression: function (node: ESTree.ObjectExpression, state) {
     const indent = state.indent.repeat(state.indentLevel++);
-    const { lineEnd, writeComments } = state;
+    const { lineEnd } = state;
     const propertyIndent = indent + state.indent;
     state.write("{");
     if (node.properties.length > 0) {
       state.write(lineEnd);
-      // if (writeComments && node.comments != null) {
-      //   formatComments(state, node.comments, propertyIndent, lineEnd);
-      // }
       const comma = "," + lineEnd;
       const { properties } = node,
         { length } = properties;
       for (let i = 0;;) {
         const property = properties[i];
-        // if (writeComments && property.comments != null) {
-        //   formatComments(state, property.comments, propertyIndent, lineEnd);
-        // }
         state.write(propertyIndent);
         this[property.type](property, state);
         if (++i < length) {
@@ -305,27 +299,8 @@ const customGenerator: Generator = {
         }
       }
       state.write(lineEnd);
-      // if (writeComments && node.trailingComments != null) {
-      //   formatComments(state, node.trailingComments, propertyIndent, lineEnd);
-      // }
       state.write(indent + "}");
     }
-    //  else if (writeComments) {
-    //   if (node.comments != null) {
-    //     state.write(lineEnd);
-    //     formatComments(state, node.comments, propertyIndent, lineEnd);
-    //     if (node.trailingComments != null) {
-    //       formatComments(state, node.trailingComments, propertyIndent, lineEnd);
-    //     }
-    //     state.write(indent + "}");
-    //   } else if (node.trailingComments != null) {
-    //     state.write(lineEnd);
-    //     formatComments(state, node.trailingComments, propertyIndent, lineEnd);
-    //     state.write(indent + "}");
-    //   } else {
-    //     state.write("}");
-    //   }
-    //}
     else {
       state.write("}");
     }
