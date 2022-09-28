@@ -13,9 +13,6 @@ jobs:
       - name: Install Deno
         uses: denoland/setup-deno@v1
 
-      - name: Optimize App
-        run: deno task opt
-
       - name: Deploy to Deno Deploy
         uses: denoland/deployctl@v1
         with:
