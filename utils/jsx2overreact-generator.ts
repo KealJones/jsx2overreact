@@ -1,47 +1,44 @@
-import { ESTree, parseScript } from 'https://esm.sh/meriyah@4.2.1';
+import { parseScript, ESTree } from 'https://esm.sh/meriyah@4.2.1';
+import * as ESTree2 from 'estree-jsx';
 // @deno-types="https://deno.land/x/astring@v1.8.3/astring.d.ts"
-import {
-  generate,
-  GENERATOR,
-} from 'https://deno.land/x/astring/src/astring.js';
-import {
-  Generator,
-  State,
-} from 'https://deno.land/x/astring@v1.8.3/astring.d.ts';
+import { generate, GENERATOR } from 'https://deno.land/x/astring/src/astring.js';
+import { Generator, State } from 'https://deno.land/x/astring@v1.8.3/astring.d.ts';
+import { Identifier } from 'https://esm.sh/v86/meriyah@4.2.1/dist/src/estree.d.ts';
 
 declare module 'https://deno.land/x/astring@v1.8.3/astring.d.ts' {
   interface State {
     generator: CustomGenerator;
-    hooks: Record<string | number | symbol, any>;
   }
 }
 
 interface CustomGenerator extends Generator {
   JSXAttribute: (
-    node: ESTree.JSXAttribute & { type: 'JSXAttribute' },
+    node: ESTree.JSXAttribute,
     state: State,
   ) => void;
   JSXElement: (
-    node: ESTree.JSXElement & { type: 'JSXElement' },
+    node: ESTree.JSXElement,
     state: State,
   ) => void;
   JSXFragment: (
-    node: ESTree.JSXFragment & { type: 'JSXFragment' },
+    node: ESTree.JSXFragment,
     state: State,
   ) => void;
   JSXIdentifier: (
-    node: ESTree.JSXIdentifier & { type: 'JSXIdentifier' },
+    node: ESTree.JSXIdentifier,
     state: State,
   ) => void;
   JSXExpressionContainer: (
-    node: ESTree.JSXExpressionContainer & { type: 'JSXExpressionContainer' },
+    node: ESTree.JSXExpressionContainer,
     state: State,
   ) => void;
-  JSXText: (node: ESTree.JSXText & { type: 'JSXText' }, state: State) => void;
+  JSXText: (node: ESTree.JSXText, state: State) => void;
   JSXSpreadAttribute: (
-    node: ESTree.JSXSpreadAttribute & { type: 'JSXSpreadAttribute' },
+    node: ESTree.JSXSpreadAttribute,
     state: State,
   ) => void;
+  JSXMemberExpression: (node: ESTree.JSXMemberExpression, state: State) => void;
+  JSXNamespacedName: (node: ESTree.JSXNamespacedName, state: State) => void;
 }
 
 function reindent(state: State, text: string, indent: string, lineEnd: string) {
@@ -87,7 +84,7 @@ function formatComments(
   }
 }
 
-const formatVariableDeclaration: Generator['VariableDeclaration'] = (
+const formatVariableDeclaration: CustomGenerator['VariableDeclaration'] = (
   node,
   state,
 ) => {
@@ -131,6 +128,11 @@ const formatJSXElement: CustomGenerator['JSXElement'] = (
     state.write(state.lineEnd);
     for (const attribute of element.attributes) {
       state.write(propIndent);
+      // Argument of type 'JSXAttribute | JSXSpreadAttribute' is not assignable to parameter of type 'never'.
+      // The intersection 'JSXAttribute & JSXSpreadAttribute' was reduced to 'never' because property 'type' has conflicting types in some constituents.
+      // Type 'JSXAttribute' is not assignable to type 'never'.deno-ts(2345)
+      //
+      // @ts-expect-error IDK why this is complaining but its saying that the `attribute` arg is broke because its `&` ing JSXAttribute and JSXSpreadAttribute together?
       state.generator[attribute.type](attribute, state);
       state.write(state.lineEnd);
     }
@@ -154,7 +156,7 @@ const formatJSXElement: CustomGenerator['JSXElement'] = (
   state.indentLevel--;
 };
 
-const formatJSXFragment: Generator['JSXFragment'] = (
+const formatJSXFragment: CustomGenerator['JSXFragment'] = (
   node: ESTree.JSXFragment,
   state,
 ) => {
@@ -181,11 +183,12 @@ const formatJSXFragment: Generator['JSXFragment'] = (
   state.indentLevel--;
 };
 
-const formatJSXAttribute: Generator['JSXAttribute'] = (
+const formatJSXAttribute: CustomGenerator['JSXAttribute'] = (
   node: ESTree.JSXAttribute,
   state,
 ) => {
   state.write('..', node);
+  // @ts-ignore
   state.generator[node.name.type](node.name, state);
   state.write(' = ', node);
   if (node.value != null) {
@@ -194,6 +197,15 @@ const formatJSXAttribute: Generator['JSXAttribute'] = (
     // Usually this is a boolean attribute that doesn't require the `={true}` in the JSX
     state.write('true', node);
   }
+};
+
+const formatJSXSpreadAttribute: CustomGenerator['JSXSpreadAttribute'] = (
+  node: ESTree.JSXSpreadAttribute,
+  state,
+) => {
+  state.write('..addProps(');
+  state.generator[node.argument.type](node, state);
+  state.write(')');
 };
 
 function formatSequence(nodes: ESTree.Node[], state: State) {
@@ -252,17 +264,26 @@ function isString(value: unknown): value is string {
 }
 
 // Unrelated but kind dope (found while building this): https://jsonformatter.org/json-to-dart
-const customGenerator: Generator = {
+const customGenerator: CustomGenerator = {
   ...GENERATOR,
   JSXElement: formatJSXElement,
   JSXFragment: formatJSXFragment,
   JSXAttribute: formatJSXAttribute,
+  JSXSpreadAttribute: formatJSXSpreadAttribute,
   JSXIdentifier: function (node: ESTree.JSXIdentifier, state) {
     if (node.name.includes('aria-')) {
-      state.write(node.name.replace('aria-', 'aria.'), node);
+      state.write(node.name.replace('aria-', 'aria.'));
       return;
     }
     this.Identifier(node, state);
+  },
+  JSXMemberExpression: function (node: ESTree.JSXMemberExpression, state) {
+    this.MemberExpression(node, state);
+  },
+  JSXNamespacedName: function (node: ESTree.JSXNamespacedName, state) {
+    // @ts-ignore this hasn't come up yet...
+    this[node.namespace.type](node.namespace, state);
+    this[node.name.type](node.name, state);
   },
   JSXExpressionContainer: function (node, state) {
     this[node.expression.type](node.expression, state);
@@ -271,11 +292,10 @@ const customGenerator: Generator = {
     if (node.value == null) {
       return;
     }
-    state.write(`'${node.value.trim()}'`, node);
+    state.write(`'${node.value.trim()}'`);
   },
   Literal: function (node, state) {
     if (node.raw != null) {
-      debugger;
       // Non-standard property
       state.write(node.raw, node);
     } else if (node.regex != null) {
@@ -286,7 +306,12 @@ const customGenerator: Generator = {
       state.write(JSON.stringify(node.value).replaceAll('"', '\''), node);
     }
   },
-  Property: function (node: ESTree.Property, state) {
+
+  Property: function (node: (ESTree2.AssignmentProperty & {
+    type: "Property";
+}) | (ESTree.Property & {
+    type: "Property";
+}), state) {
     if (node.method || node.kind[0] !== 'i') {
       // Either a method or of kind `set` or `get` (not `init`)
       this.MethodDefinition(node, state);
@@ -397,6 +422,5 @@ const customGenerator: Generator = {
 
 export function jsx2OverReact(str: string): string {
   const parsedJsx = parseScript(str, { module: true, jsx: true });
-  //console.log(JSON.stringify(parsedJsx, null, 2));
   return generate(parsedJsx, { generator: customGenerator });
 }

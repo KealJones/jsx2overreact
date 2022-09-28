@@ -23,7 +23,8 @@
   },
   "fmt": {
     "options": {
-      "singleQuote": true
+      "singleQuote": true,
+      "lineWidth": 120
     }
   }
 }

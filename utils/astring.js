@@ -1057,15 +1057,11 @@ class State {
     // Formating setup
     this.indent = setup.indent != null ? setup.indent : '  ';
     this.lineEnd = setup.lineEnd != null ? setup.lineEnd : '\n';
-    this.indentLevel = setup.startingIndentLevel != null
-      ? setup.startingIndentLevel
-      : 0;
+    this.indentLevel = setup.startingIndentLevel != null ? setup.startingIndentLevel : 0;
     this.writeComments = setup.comments ? setup.comments : false;
     // Source map
     if (setup.sourceMap != null) {
-      this.write = setup.output == null
-        ? this.writeAndMap
-        : this.writeToStreamAndMap;
+      this.write = setup.output == null ? this.writeAndMap : this.writeToStreamAndMap;
       this.sourceMap = setup.sourceMap;
       this.line = 1;
       this.column = 0;
@@ -1138,9 +1134,7 @@ class State {
     if (length > 0) {
       if (
         this.lineEndSize > 0 &&
-        (lineEnd.length === 1
-          ? code[length - 1] === lineEnd
-          : code.endsWith(lineEnd))
+        (lineEnd.length === 1 ? code[length - 1] === lineEnd : code.endsWith(lineEnd))
       ) {
         this.line += this.lineEndSize;
         this.column = 0;
