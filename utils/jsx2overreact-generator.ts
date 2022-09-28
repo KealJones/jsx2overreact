@@ -163,7 +163,8 @@ const formatJSXAttribute: Generator["JSXAttribute"] = (
   if (node.value != null) {
     state.generator[node.value.type](node.value, state);
   } else {
-    state.write("null", node);
+    // Usually this is a boolean attribute that doesn't require the `={true}` in the JSX
+    state.write("true", node);
   }
 };
 
@@ -274,6 +275,7 @@ const customGenerator: Generator = {
         }
         state.write(': ')
       }
+
       this[node.value.type](node.value, state)
     }
   },
