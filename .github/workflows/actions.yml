@@ -18,3 +18,4 @@ jobs:
         with:
           project: jsx2overreact # the name of the project on Deno Deploy
           entrypoint: server.ts # the entrypoint to deploy
+          import-map: import_map.json # the import map lookup
