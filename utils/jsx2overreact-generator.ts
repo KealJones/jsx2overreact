@@ -1,26 +1,54 @@
-import { ESTree, parseScript } from "https://esm.sh/meriyah@4.2.1";
+import { ESTree, parseScript } from 'https://esm.sh/meriyah@4.2.1';
 // @deno-types="https://deno.land/x/astring@v1.8.3/astring.d.ts"
 import {
   generate,
   GENERATOR,
-} from "https://deno.land/x/astring/src/astring.js";
+} from 'https://deno.land/x/astring/src/astring.js';
 import {
   Generator,
   State,
-} from "https://deno.land/x/astring@v1.8.3/astring.d.ts";
+} from 'https://deno.land/x/astring@v1.8.3/astring.d.ts';
 
-declare module "https://deno.land/x/astring@v1.8.3/astring.d.ts" {
+declare module 'https://deno.land/x/astring@v1.8.3/astring.d.ts' {
   interface State {
-    generator: Generator;
+    generator: CustomGenerator;
     hooks: Record<string | number | symbol, any>;
   }
+}
+
+interface CustomGenerator extends Generator {
+  JSXAttribute: (
+    node: ESTree.JSXAttribute & { type: 'JSXAttribute' },
+    state: State,
+  ) => void;
+  JSXElement: (
+    node: ESTree.JSXElement & { type: 'JSXElement' },
+    state: State,
+  ) => void;
+  JSXFragment: (
+    node: ESTree.JSXFragment & { type: 'JSXFragment' },
+    state: State,
+  ) => void;
+  JSXIdentifier: (
+    node: ESTree.JSXIdentifier & { type: 'JSXIdentifier' },
+    state: State,
+  ) => void;
+  JSXExpressionContainer: (
+    node: ESTree.JSXExpressionContainer & { type: 'JSXExpressionContainer' },
+    state: State,
+  ) => void;
+  JSXText: (node: ESTree.JSXText & { type: 'JSXText' }, state: State) => void;
+  JSXSpreadAttribute: (
+    node: ESTree.JSXSpreadAttribute & { type: 'JSXSpreadAttribute' },
+    state: State,
+  ) => void;
 }
 
 function reindent(state: State, text: string, indent: string, lineEnd: string) {
   /*
   Writes into `state` the `text` string reindented with the provided `indent`.
   */
-  const lines = text.split("\n");
+  const lines = text.split('\n');
   const end = lines.length - 1;
   state.write(lines[0].trim());
   if (end > 0) {
@@ -47,19 +75,19 @@ function formatComments(
   for (let i = 0; i < length; i++) {
     const comment = comments[i];
     state.write(indent);
-    if (comment.type[0] === "L") {
+    if (comment.type[0] === 'L') {
       // Line comment
-      state.write("// " + comment.value.trim() + "\n", comment);
+      state.write('// ' + comment.value.trim() + '\n', comment);
     } else {
       // Block comment
-      state.write("/*");
+      state.write('/*');
       reindent(state, comment.value, indent, lineEnd);
-      state.write("*/" + lineEnd);
+      state.write('*/' + lineEnd);
     }
   }
 }
 
-const formatVariableDeclaration: Generator["VariableDeclaration"] = (
+const formatVariableDeclaration: Generator['VariableDeclaration'] = (
   node,
   state,
 ) => {
@@ -68,19 +96,19 @@ const formatVariableDeclaration: Generator["VariableDeclaration"] = (
     */
   const { generator } = state;
   const { declarations } = node;
-  state.write("var ");
+  state.write('var ');
   const { length } = declarations;
   if (length > 0) {
     generator.VariableDeclarator(declarations[0], state);
     for (let i = 1; i < length; i++) {
-      state.write(", ");
+      state.write(', ');
       generator.VariableDeclarator(declarations[i], state);
     }
   }
 };
 
-const formatJSXElement: Generator["JSXElement"] = (
-  node: ESTree.JSXElement,
+const formatJSXElement: CustomGenerator['JSXElement'] = (
+  node,
   state,
 ) => {
   const indent = state.indent.repeat(state.indentLevel++);
@@ -89,15 +117,15 @@ const formatJSXElement: Generator["JSXElement"] = (
   const element = node.openingElement;
   const children = node.children.filter((
     el,
-  ) => (el.type != "JSXText" ||
-    (el.type == "JSXText" &&
-      el.value.replace(/(\s|\r\n|\r|\n)/g, "").length != 0))
+  ) => (el.type != 'JSXText' ||
+    (el.type == 'JSXText' &&
+      el.value.replace(/(\s|\r\n|\r|\n)/g, '').length != 0))
   );
   const hasProps = element.attributes != null && element.attributes.length > 0;
   const hasChildren = children != null && children.length > 0;
 
-  if (hasProps) state.write("(");
-  state.write(formatElementName(element.name) + "()");
+  if (hasProps) state.write('(');
+  state.write(formatElementName(element.name) + '()');
   if (hasProps) {
     const propIndent = state.indent.repeat(state.indentLevel++);
     state.write(state.lineEnd);
@@ -108,9 +136,9 @@ const formatJSXElement: Generator["JSXElement"] = (
     }
     state.indentLevel--;
     state.write(indent);
-    state.write(")");
+    state.write(')');
   }
-  state.write("(");
+  state.write('(');
   if (hasChildren) {
     state.write(state.lineEnd);
     const { length } = children;
@@ -118,15 +146,15 @@ const formatJSXElement: Generator["JSXElement"] = (
       const child = children[i];
       state.write(jsxElementIndent);
       state.generator[child.type](child, state);
-      state.write("," + state.lineEnd);
+      state.write(',' + state.lineEnd);
     }
     state.write(indent);
   }
-  state.write(")");
+  state.write(')');
   state.indentLevel--;
 };
 
-const formatJSXFragment: Generator["JSXFragment"] = (
+const formatJSXFragment: Generator['JSXFragment'] = (
   node: ESTree.JSXFragment,
   state,
 ) => {
@@ -134,11 +162,11 @@ const formatJSXFragment: Generator["JSXFragment"] = (
   const jsxElementIndent = indent + state.indent;
   const children = node.children.filter((
     el,
-  ) => (el.type == "JSXText" && !el.value.trim().length));
+  ) => (el.type == 'JSXText' && !el.value.trim().length));
   const hasChildren = children != null && children.length > 0;
-  state.write("Fragment()");
+  state.write('Fragment()');
 
-  state.write("(");
+  state.write('(');
   if (hasChildren) {
     state.write(state.lineEnd);
     const { length } = children;
@@ -149,22 +177,22 @@ const formatJSXFragment: Generator["JSXFragment"] = (
     }
     state.write(indent, node);
   }
-  state.write(")", node);
+  state.write(')', node);
   state.indentLevel--;
 };
 
-const formatJSXAttribute: Generator["JSXAttribute"] = (
+const formatJSXAttribute: Generator['JSXAttribute'] = (
   node: ESTree.JSXAttribute,
   state,
 ) => {
-  state.write("..", node);
+  state.write('..', node);
   state.generator[node.name.type](node.name, state);
-  state.write(" = ", node);
+  state.write(' = ', node);
   if (node.value != null) {
     state.generator[node.value.type](node.value, state);
   } else {
     // Usually this is a boolean attribute that doesn't require the `={true}` in the JSX
-    state.write("true", node);
+    state.write('true', node);
   }
 };
 
@@ -173,17 +201,17 @@ function formatSequence(nodes: ESTree.Node[], state: State) {
     Writes into `state` a sequence of `nodes`.
     */
   const { generator } = state;
-  state.write("(");
+  state.write('(');
   if (nodes != null && nodes.length > 0) {
     generator[nodes[0].type](nodes[0], state);
     const { length } = nodes;
     for (let i = 1; i < length; i++) {
       const param = nodes[i];
-      state.write(", ");
+      state.write(', ');
       generator[param.type](param, state);
     }
   }
-  state.write(")");
+  state.write(')');
 }
 
 function startsWithCapital(word: string): boolean {
@@ -206,13 +234,13 @@ function formatName(
 ): string {
   if (isString(name)) {
     return name;
-  } else if ("type" in name) {
+  } else if ('type' in name) {
     switch (name.type) {
-      case "JSXIdentifier":
+      case 'JSXIdentifier':
         return name.name;
-      case "JSXMemberExpression":
+      case 'JSXMemberExpression':
         return name.property.name;
-      case "JSXNamespacedName":
+      case 'JSXNamespacedName':
         return `${formatName(name.namespace)}.${formatName(name)}`;
     }
   }
@@ -220,7 +248,7 @@ function formatName(
 }
 
 function isString(value: unknown): value is string {
-  return typeof value === "string" || value instanceof String;
+  return typeof value === 'string' || value instanceof String;
 }
 
 // Unrelated but kind dope (found while building this): https://jsonformatter.org/json-to-dart
@@ -230,8 +258,8 @@ const customGenerator: Generator = {
   JSXFragment: formatJSXFragment,
   JSXAttribute: formatJSXAttribute,
   JSXIdentifier: function (node: ESTree.JSXIdentifier, state) {
-    if (node.name.includes("aria-")) {
-      state.write(node.name.replace("aria-", "aria."), node);
+    if (node.name.includes('aria-')) {
+      state.write(node.name.replace('aria-', 'aria.'), node);
       return;
     }
     this.Identifier(node, state);
@@ -253,40 +281,40 @@ const customGenerator: Generator = {
     } else if (node.regex != null) {
       this.RegExpLiteral(node, state);
     } else if (node.bigint != null) {
-      state.write(node.bigint + "n", node);
+      state.write(node.bigint + 'n', node);
     } else {
-      state.write(JSON.stringify(node.value).replaceAll('"', "'"), node);
+      state.write(JSON.stringify(node.value).replaceAll('"', '\''), node);
     }
   },
-  Property: function(node: ESTree.Property, state) {
+  Property: function (node: ESTree.Property, state) {
     if (node.method || node.kind[0] !== 'i') {
       // Either a method or of kind `set` or `get` (not `init`)
-      this.MethodDefinition(node, state)
+      this.MethodDefinition(node, state);
     } else {
       if (!node.shorthand) {
         if (node.computed) {
-          state.write('[')
-          this[node.key.type](node.key, state)
-          state.write(']')
+          state.write('[');
+          this[node.key.type](node.key, state);
+          state.write(']');
         } else {
-          if (node.key.type == 'Identifier') state.write("'");
-          this[node.key.type](node.key, state)
-          if (node.key.type == 'Identifier') state.write("'");
+          if (node.key.type == 'Identifier') state.write('\'');
+          this[node.key.type](node.key, state);
+          if (node.key.type == 'Identifier') state.write('\'');
         }
-        state.write(': ')
+        state.write(': ');
       }
 
-      this[node.value.type](node.value, state)
+      this[node.value.type](node.value, state);
     }
   },
   ObjectExpression: function (node: ESTree.ObjectExpression, state) {
     const indent = state.indent.repeat(state.indentLevel++);
     const { lineEnd } = state;
     const propertyIndent = indent + state.indent;
-    state.write("{");
+    state.write('{');
     if (node.properties.length > 0) {
       state.write(lineEnd);
-      const comma = "," + lineEnd;
+      const comma = ',' + lineEnd;
       const { properties } = node,
         { length } = properties;
       for (let i = 0;;) {
@@ -300,10 +328,9 @@ const customGenerator: Generator = {
         }
       }
       state.write(lineEnd);
-      state.write(indent + "}");
-    }
-    else {
-      state.write("}");
+      state.write(indent + '}');
+    } else {
+      state.write('}');
     }
     state.indentLevel--;
   },
@@ -315,19 +342,19 @@ const customGenerator: Generator = {
     const { params } = node;
     if (params != null) {
       formatSequence(node.params, state);
-      state.write(" ");
+      state.write(' ');
     }
-    if (node.body.type[0] === "O") {
+    if (node.body.type[0] === 'O') {
       // Body is an object expression
-      state.write("(");
+      state.write('(');
       this.ObjectExpression(node.body, state);
-      state.write(")");
+      state.write(')');
     } else {
       this[node.body.type](node.body, state);
     }
   },
   ArrayExpression: function (node: ESTree.ArrayExpression, state) {
-    state.write("[");
+    state.write('[');
     if (node.elements.length > 0) {
       const { elements } = node,
         { length } = elements;
@@ -337,19 +364,19 @@ const customGenerator: Generator = {
           this[element.type](element, state);
         }
         if (++i < length) {
-          state.write(", ");
+          state.write(', ');
         } else {
           if (element == null) {
-            state.write(", ");
+            state.write(', ');
           }
           break;
         }
       }
     }
-    state.write("]");
+    state.write(']');
   },
   ArrayPattern: function (node, state) {
-    if (node.elements.length == 2 && node.elements[1].name.includes("set")) {
+    if (node.elements.length == 2 && node.elements[1].name.includes('set')) {
       this[node.elements[0].type](node.elements[0], state);
     } else {
       state.generator.ArrayExpression(node, state);
@@ -358,13 +385,13 @@ const customGenerator: Generator = {
   VariableDeclarator: function (node, state) {
     this[node.id.type](node.id, state);
     if (node.init != null) {
-      state.write(" = ");
+      state.write(' = ');
       this[node.init.type](node.init, state);
     }
   },
   VariableDeclaration: function (node, state) {
     formatVariableDeclaration(node, state);
-    state.write(";");
+    state.write(';');
   },
 };
 

@@ -10,13 +10,20 @@
     "types": [
       "https://deno.land/x/aleph@1.0.0-beta.18/types.d.ts"
     ],
-    "jsx": "react-jsx",
+    "jsx": "react",
+    "jsxFactory": "React.createElement",
+    "jsxFragmentFactory": "React.Fragment",
     "jsxImportSource": "https://esm.sh/react@18.2.0"
   },
-  "importMap": "import_map.json",
+  "importMap": "./import_map.json",
   "tasks": {
     "dev": "deno run -A dev.ts",
     "start": "deno run -A server.ts",
     "opt": "deno run -A server.ts --optimize"
+  },
+  "fmt": {
+    "options": {
+      "singleQuote": true
+    }
   }
 }

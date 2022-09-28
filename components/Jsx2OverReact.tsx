@@ -1,4 +1,4 @@
-import { jsx2OverReact } from "../utils/jsx2overreact-generator.ts";
+import { jsx2OverReact } from '../utils/jsx2overreact-generator.ts';
 import React from 'react';
 
 export default function Jsx2OverReactConvert(props: Record<never, never>) {
@@ -11,9 +11,21 @@ export default function Jsx2OverReactConvert(props: Record<never, never>) {
     }
   }, [inputRef.current?.value]);
   return (
-    <div style={{width: '100%', height: '100%', position: 'relative', display: 'flex', alignItems: 'stretch', justifyContent: 'space-evenly', flexDirection: 'row'}}>
-      <textarea style={{flex: 1, background: '#1c2834', color: '#fff'}} ref={inputRef} defaultValue={
-        `import * as React from 'react';
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+        display: 'flex',
+        alignItems: 'stretch',
+        justifyContent: 'space-evenly',
+        flexDirection: 'row',
+      }}
+    >
+      <textarea
+        style={{ flex: 1, background: '#1c2834', color: '#fff' }}
+        ref={inputRef}
+        defaultValue={`import * as React from 'react';
         import { styled } from '@mui/material/styles';
         import FormControlLabel from '@mui/material/FormControlLabel';
         import HighlightedCode from 'docs/src/modules/components/HighlightedCode';
@@ -516,10 +528,14 @@ export default function Jsx2OverReactConvert(props: Record<never, never>) {
               <HighlightedCode code={jsx} language="jsx" />
             </Box>
           );
-        }`
-      }/>
-      <button style={{padding: '5px'}} onClick={runJsx2Or}>CONVERT!</button>
-      <textarea style={{flex: 1, background: '#1c2834', color: '#fff'}} ref={outputRef}></textarea>
+        }`}
+      />
+      <button style={{ padding: '5px' }} onClick={runJsx2Or}>CONVERT!</button>
+      <textarea
+        style={{ flex: 1, background: '#1c2834', color: '#fff' }}
+        ref={outputRef}
+      >
+      </textarea>
     </div>
   );
 }

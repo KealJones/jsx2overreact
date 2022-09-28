@@ -1,4 +1,4 @@
-import dev from "aleph/dev";
+import dev from 'aleph/dev';
 
 dev({
   baseUrl: import.meta.url,
