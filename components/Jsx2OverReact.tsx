@@ -1,5 +1,5 @@
 import { jsx2OverReact } from '../utils/jsx2overreact-generator.ts';
-import React from 'react';
+import * as React from 'react';
 
 export default function Jsx2OverReactConvert(props: Record<never, never>) {
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
