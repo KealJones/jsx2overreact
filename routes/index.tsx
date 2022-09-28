@@ -1,3 +1,4 @@
+/** @jsx React.createElement */
 import * as React from 'react';
 import Jsx2OverReactConvert from '../components/Jsx2OverReact.tsx';
 

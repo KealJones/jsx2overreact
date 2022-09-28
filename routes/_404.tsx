@@ -1,3 +1,5 @@
+/** @jsx React.createElement */
+import * as React from 'react';
 import { Link } from 'aleph/react';
 
 export default function E404() {
