@@ -1,4 +1,5 @@
 /** @jsx React.createElement */
+/** @jsxFragment React.Fragment */
 import * as React from 'react';
 import { Link } from 'aleph/react';
 
