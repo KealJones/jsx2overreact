@@ -1,3 +1,6 @@
+// support jsx on deno deploy
+/** @jsxImportSource react */
+
 import { jsx2OverReact } from '../utils/jsx2overreact-generator.ts';
 import * as React from 'react';
 
