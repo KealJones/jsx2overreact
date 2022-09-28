@@ -8,7 +8,6 @@ import {
   Generator,
   State,
 } from "https://deno.land/x/astring@v1.8.3/astring.d.ts";
-import { JSXEmptyExpression } from "https://esm.sh/v86/meriyah@4.2.1/dist/src/estree.d.ts";
 
 declare module "https://deno.land/x/astring@v1.8.3/astring.d.ts" {
   interface State {

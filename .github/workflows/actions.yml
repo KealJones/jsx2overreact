@@ -13,11 +13,8 @@ jobs:
       - name: Install Deno
         uses: denoland/setup-deno@v1
 
-      - name: Build App
-        run: deno task build
-
       - name: Deploy to Deno Deploy
         uses: denoland/deployctl@v1
         with:
           project: jsx2overreact # the name of the project on Deno Deploy
-          entrypoint: dist/server.js # the entrypoint to deploy
+          entrypoint: server.ts # the entrypoint to deploy
