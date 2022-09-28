@@ -1,4 +1,4 @@
-import { parseScript, ESTree } from 'https://esm.sh/meriyah@4.2.1';
+import { ESTree, parseScript } from 'https://esm.sh/meriyah@4.2.1';
 import * as ESTree2 from 'estree-jsx';
 // @deno-types="https://deno.land/x/astring@v1.8.3/astring.d.ts"
 import { generate, GENERATOR } from 'https://deno.land/x/astring/src/astring.js';
@@ -307,11 +307,16 @@ const customGenerator: CustomGenerator = {
     }
   },
 
-  Property: function (node: (ESTree2.AssignmentProperty & {
-    type: "Property";
-}) | (ESTree.Property & {
-    type: "Property";
-}), state) {
+  Property: function (
+    node:
+      | (ESTree2.AssignmentProperty & {
+        type: 'Property';
+      })
+      | (ESTree.Property & {
+        type: 'Property';
+      }),
+    state,
+  ) {
     if (node.method || node.kind[0] !== 'i') {
       // Either a method or of kind `set` or `get` (not `init`)
       this.MethodDefinition(node, state);
