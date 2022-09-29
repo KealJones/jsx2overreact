@@ -1,13 +1,17 @@
 import { ESTree, parseScript } from 'https://esm.sh/meriyah@4.2.1';
 import * as ESTree2 from 'estree-jsx';
-// @deno-types="https://deno.land/x/astring@v1.8.3/astring.d.ts"
-import { generate, GENERATOR } from 'https://deno.land/x/astring/src/astring.js';
+import {
+  EXPRESSIONS_PRECEDENCE,
+  generate,
+  GENERATOR,
+  NEEDS_PARENTHESES,
+} from 'https://deno.land/x/astring@v1.8.3/src/astring.js';
 import { Generator, State } from 'https://deno.land/x/astring@v1.8.3/astring.d.ts';
-import { Identifier } from 'https://esm.sh/v86/meriyah@4.2.1/dist/src/estree.d.ts';
 
 declare module 'https://deno.land/x/astring@v1.8.3/astring.d.ts' {
   interface State {
     generator: CustomGenerator;
+    expressionsPrecedence: Record<keyof typeof EXPRESSIONS_PRECEDENCE, number>;
   }
 }
 
@@ -57,6 +61,56 @@ function reindent(state: State, text: string, indent: string, lineEnd: string) {
   }
 }
 
+function isCallExpressionNamed(node: ESTree.CallExpression, name: string) {
+  let callName;
+  if (node.callee.type == 'CallExpression') {
+    callName = node.callee.callee.name;
+  } else {
+    callName = node.callee.name;
+  }
+  return callName == name ? true : false;
+}
+
+// styled in JS uses a double invocation like styled('div')({..}) in dart it only uses 1 with some named params so lets fix that.
+function formatStyledCallExpression(node: ESTree.CallExpression, state: State) {
+  state.write('styled(');
+  if (node.callee.arguments[0].type == 'Literal') {
+    state.write(`Dom.${node.callee.arguments[0].value}`);
+  } else {
+    state.generator[node.callee.arguments[0].type](node.callee.arguments[0], state);
+  }
+  const namedArgs: Record<string, any> = {};
+  if (node.callee.arguments[1] != undefined) {
+    namedArgs['options'] = node.callee.arguments[1];
+  }
+  let styleKey = 'buildStyles';
+  if (node.arguments[0].type == 'ObjectExpression') {
+    styleKey = 'stylesMap';
+  }
+  namedArgs[styleKey] = node.arguments[0];
+  // the first arg was already written above so add a comma
+  state.write(', ');
+  formatNamedArgs(namedArgs, state);
+}
+
+function formatNamedArgs(args: Record<string, ESTree.Node> = {}, state: State) {
+  const { generator } = state;
+  let first = true;
+  if (args != null) {
+    for (const argName in args) {
+      const param = args[argName];
+      if (!first) {
+        state.write(', ');
+      } else {
+        first = false;
+      }
+      state.write(argName + ': ');
+      generator[param.type](param, state);
+    }
+  }
+  state.write(')');
+}
+
 function formatComments(
   state: State,
   comments: any[],
@@ -85,15 +139,22 @@ function formatComments(
 }
 
 const formatVariableDeclaration: CustomGenerator['VariableDeclaration'] = (
-  node,
+  node: ESTree.VariableDeclaration,
   state,
 ) => {
   /*
     Writes into `state` a variable declaration.
     */
   const { generator } = state;
-  const { declarations } = node;
-  state.write('var ');
+  const { declarations = [] } = node;
+  if (node.kind == 'const') {
+    // Best guess, it could be wrong at times though cause theres no 1 to 1 type for a js const in dart...
+    state.write('final');
+  } else {
+    state.write('var');
+  }
+  // Add a space after the kind
+  state.write(' ');
   const { length } = declarations;
   if (length > 0) {
     generator.VariableDeclarator(declarations[0], state);
@@ -372,6 +433,10 @@ const customGenerator: CustomGenerator = {
     const { params } = node;
     if (params != null) {
       formatSequence(node.params, state);
+    }
+    if (!(node.body.type === 'BlockStatement')) {
+      state.write(' => ');
+    } else {
       state.write(' ');
     }
     if (node.body.type[0] === 'O') {
@@ -412,6 +477,39 @@ const customGenerator: CustomGenerator = {
       state.generator.ArrayExpression(node, state);
     }
   },
+  CallExpression: function (node, state) {
+    // Special Case
+    if (isCallExpressionNamed(node, 'styled')) {
+      formatStyledCallExpression(node, state);
+      return;
+    }
+    const precedence = state.expressionsPrecedence[node.callee.type as keyof typeof EXPRESSIONS_PRECEDENCE];
+    if (
+      precedence === NEEDS_PARENTHESES ||
+      precedence < state.expressionsPrecedence.CallExpression
+    ) {
+      state.write('(');
+      this[node.callee.type](node.callee, state);
+      state.write(')');
+    } else {
+      this[node.callee.type](node.callee, state);
+    }
+    if (node.optional) {
+      state.write('?.');
+    }
+    formatSequence(node['arguments'], state);
+  },
+  FunctionDeclaration: function (node: ESTree.FunctionDeclaration, state: State) {
+    state.write(
+      (node.id ? node.id.name : '') +
+        (node.async ? 'async' : '') +
+        (node.generator ? node.async ? '* ' : 'sync* ' : ''),
+      node,
+    );
+    formatSequence(node.params, state);
+    state.write(' ');
+    if (node.body != null) this[node.body.type](node.body, state);
+  },
   VariableDeclarator: function (node, state) {
     this[node.id.type](node.id, state);
     if (node.init != null) {
@@ -426,6 +524,7 @@ const customGenerator: CustomGenerator = {
 };
 
 export function jsx2OverReact(str: string): string {
-  const parsedJsx = parseScript(str, { module: true, jsx: true });
-  return generate(parsedJsx, { generator: customGenerator });
+  const ast = parseScript(str, { module: true, jsx: true });
+  console.log(ast);
+  return generate(ast, { generator: customGenerator });
 }
