@@ -1,4 +1,5 @@
 import { ESTree, parseScript } from 'https://esm.sh/meriyah@4.2.1';
+import { walk } from 'https://esm.sh/estree-walker';
 import * as ESTree2 from 'estree-jsx';
 import {
   EXPRESSIONS_PRECEDENCE,
@@ -14,6 +15,16 @@ declare module 'https://deno.land/x/astring@v1.8.3/astring.d.ts' {
     expressionsPrecedence: Record<keyof typeof EXPRESSIONS_PRECEDENCE, number>;
   }
 }
+
+declare module 'https://esm.sh/meriyah@4.2.1' {
+  namespace ESTree {
+    interface _Node {
+      comments: ESTree.Comment[]
+    }
+  }
+}
+
+let writeComments = true;
 
 interface CustomGenerator extends Generator {
   JSXAttribute: (
@@ -405,11 +416,17 @@ const customGenerator: CustomGenerator = {
     state.write('{');
     if (node.properties.length > 0) {
       state.write(lineEnd);
+      if (writeComments && node.comments != null) {
+        formatComments(state, node.comments, propertyIndent, lineEnd);
+      }
       const comma = ',' + lineEnd;
       const { properties } = node,
         { length } = properties;
       for (let i = 0;;) {
         const property = properties[i];
+        if (writeComments && property.comments != null) {
+          formatComments(state, property.comments, propertyIndent, lineEnd);
+        }
         state.write(propertyIndent);
         this[property.type](property, state);
         if (++i < length) {
@@ -419,10 +436,28 @@ const customGenerator: CustomGenerator = {
         }
       }
       state.write(lineEnd);
+      // if (writeComments && node.trailingComments != null) {
+      //   formatComments(state, node.trailingComments, propertyIndent, lineEnd);
+      // }
       state.write(indent + '}');
-    } else {
+    } // else if (writeComments) {
+    //   if (node.comments != null) {
+    //     state.write(lineEnd);
+    //     formatComments(state, node.comments, propertyIndent, lineEnd);
+    //     if (node.trailingComments != null) {
+    //       formatComments(state, node.trailingComments, propertyIndent, lineEnd);
+    //     }
+    //     state.write(indent + '}');
+    //   } else if (node.trailingComments != null) {
+    //     state.write(lineEnd);
+    //     formatComments(state, node.trailingComments, propertyIndent, lineEnd);
+    //     state.write(indent + '}');
+    //   } else {
+    //     state.write('}');
+    //   }
+    // } else {
       state.write('}');
-    }
+    // }
     state.indentLevel--;
   },
   RegExpLiteral: function (node, state) {
@@ -524,7 +559,66 @@ const customGenerator: CustomGenerator = {
 };
 
 export function jsx2OverReact(str: string): string {
-  const ast = parseScript(str, { module: true, jsx: true });
+  const comments: ESTree.Comment[] = [];
+  const ast = parseScript(str, { module: true, jsx: true, onComment: comments });
+  attachComments(ast, comments);
   console.log(ast);
   return generate(ast, { generator: customGenerator });
+}
+
+// These node types will not get any comments attached to them
+const skipNodes = new Set([
+  'Identifier',
+])
+
+/**
+ * Attach comments to the next node after the comment's location
+ * @param {Object} ast - The object returned by parse()
+ * @param {Object[]} comments - The comments obtained by using
+ *                              the { onComment: [] } option of parse()
+ * @example
+ *    const code = '// comment\n const x = 42'
+ *    const comments = []
+ *    const ast = meriyah.parse(code, { onComment: comments })
+ *    attachComments(ast, comments)
+ */
+function attachComments(ast: ESTree.Program, comments: ESTree.Comment[]) {
+  const nodePositions    = Array(ast.end).fill(null)
+  const commentPositions = Array(ast.end).fill(null)
+
+  walk(ast, {
+    enter(node: any, parent: any, prop: any, index: any) {
+      if (skipNodes.has(node.type))
+        return
+      nodePositions[node.start] = node
+    }
+  })
+
+  comments.forEach((node: any) => {
+    node.comment = true
+    for (let i = node.start; i < node.end; i++) {
+      commentPositions[i] = node
+    }
+  })
+
+  for (let i = 0; i < commentPositions.length; i++) {
+    const comment = commentPositions[i]
+    if (!comment)
+      continue
+
+    // Attach node
+    for (; i < commentPositions.length; i++) {
+      const node = nodePositions[i]
+      if (!node)
+        continue
+      node.comment = comment
+      break
+    }
+
+    // Advance until end of comment
+    for (; i < commentPositions.length; i++) {
+      if (comment !== commentPositions[i])
+        break
+    }
+  }
 }
