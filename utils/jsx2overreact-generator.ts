@@ -666,46 +666,46 @@ VariableDeclaration: (node: ESTree.VariableDeclaration, state: State) => {
 
 export function jsx2OverReact(str: string): string {
   const comments: ESTree.Comment[] = [];
-  // Create a Program with an in-memory emit
-  // const createdFiles: Record<string, string> = {};
-  // const host = ts.createCompilerHost( {module: ts.ModuleKind.CommonJS, allowJs:true });
-  // host.writeFile = (fileName: string, contents: string) => createdFiles[fileName] = contents
-  const filename = "test.ts";
-const sourceFile = ts.createSourceFile(
-    filename, str, ts.ScriptTarget.Latest
-);
+//   // Create a Program with an in-memory emit
+//   // const createdFiles: Record<string, string> = {};
+//   // const host = ts.createCompilerHost( {module: ts.ModuleKind.CommonJS, allowJs:true });
+//   // host.writeFile = (fileName: string, contents: string) => createdFiles[fileName] = contents
+//   const filename = "test.ts";
+// const sourceFile = ts.createSourceFile(
+//     filename, str, ts.ScriptTarget.Latest
+// );
 
-const defaultCompilerHost = ts.createCompilerHost({});
+// const defaultCompilerHost = ts.createCompilerHost({});
 
-const customCompilerHost: ts.CompilerHost = {
-    getSourceFile: (name, languageVersion) => {
-        console.log(`getSourceFile ${name}`);
+// const customCompilerHost: ts.CompilerHost = {
+//     getSourceFile: (name, languageVersion) => {
+//         console.log(`getSourceFile ${name}`);
 
-        if (name === filename) {
-            return sourceFile;
-        } else {
-            return defaultCompilerHost.getSourceFile(
-                name, languageVersion
-            );
-        }
-    },
-    writeFile: (filename, data) => {},
-    getDefaultLibFileName: () => "lib.d.ts",
-    useCaseSensitiveFileNames: () => false,
-    getCanonicalFileName: filename => filename,
-    getCurrentDirectory: () => "",
-    getNewLine: () => "\n",
-    getDirectories: () => [],
-    fileExists: () => true,
-    readFile: () => ""
-};
+//         if (name === filename) {
+//             return sourceFile;
+//         } else {
+//             return defaultCompilerHost.getSourceFile(
+//                 name, languageVersion
+//             );
+//         }
+//     },
+//     writeFile: (filename, data) => {},
+//     getDefaultLibFileName: () => "lib.d.ts",
+//     useCaseSensitiveFileNames: () => false,
+//     getCanonicalFileName: filename => filename,
+//     getCurrentDirectory: () => "",
+//     getNewLine: () => "\n",
+//     getDirectories: () => [],
+//     fileExists: () => true,
+//     readFile: () => ""
+// };
 
-const program = ts.createProgram(
-    ["test.ts"], {}, customCompilerHost
-);
-const typeChecker = program.getTypeChecker();
-  const transpiler = new ts2dart.Transpiler();
-  console.log(transpiler.translateProgram(program, customCompilerHost))
+// const program = ts.createProgram(
+//     ["test.ts"], {}, customCompilerHost
+// );
+// const typeChecker = program.getTypeChecker();
+//   const transpiler = new ts2dart.Transpiler();
+//   console.log(transpiler.translateProgram(program, customCompilerHost))
   const ast = parseScript(str, { module: true, jsx: true, ranges: true, onComment: comments });
   attachComments(ast, comments);
   console.log(ast);
