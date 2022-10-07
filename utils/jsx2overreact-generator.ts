@@ -1,6 +1,8 @@
-import { ESTree, parseScript } from 'https://esm.sh/meriyah@4.2.1';
+import { ESTree, parseScript } from 'https://esm.sh/meriyah@4.3.0';
 import { walk } from 'https://esm.sh/estree-walker';
-import * as ESTree2 from 'estree-jsx';
+import ts from 'https://esm.sh/typescript';
+import * as ts2dart from 'https://esm.sh/ts2dart@0.9.11';
+import * as ESTree2 from 'estree';
 import {
   EXPRESSIONS_PRECEDENCE,
   generate,
@@ -8,23 +10,34 @@ import {
   NEEDS_PARENTHESES,
 } from 'https://deno.land/x/astring@v1.8.3/src/astring.js';
 import { Generator, State } from 'https://deno.land/x/astring@v1.8.3/astring.d.ts';
+import ts from 'https://esm.sh/v96/typescript@4.8.4/lib/typescript.d.ts';
 
 declare module 'https://deno.land/x/astring@v1.8.3/astring.d.ts' {
   interface State {
     generator: CustomGenerator;
     expressionsPrecedence: Record<keyof typeof EXPRESSIONS_PRECEDENCE, number>;
+    hookIdentifiers: Record<string, Record<string, string>>;
+    currentFunctionComponentName: string;
+    currentFunctionComponentRange: number[];
   }
 }
 
-declare module 'https://esm.sh/meriyah@4.2.1' {
+declare module 'https://esm.sh/meriyah@4.3.0' {
   namespace ESTree {
     interface _Node {
-      comments: ESTree.Comment[]
+      comments?: ESTree.Comment[] | undefined;
+      trailingComments?: ESTree.Comment[] | undefined;
+      leadingComments?: ESTree.Comment[] | undefined;
     }
   }
 }
 
-let writeComments = true;
+const writeComments = false;
+
+const specialFeatures = {
+  or_styled: true,
+  or_hooks: true,
+}
 
 interface CustomGenerator extends Generator {
   JSXAttribute: (
@@ -72,15 +85,22 @@ function reindent(state: State, text: string, indent: string, lineEnd: string) {
   }
 }
 
-function isCallExpressionNamed(node: ESTree.CallExpression, name: string) {
+const getCallExpressionName = (node: ESTree.CallExpression): string => {
   let callName;
   if (node.callee.type == 'CallExpression') {
     callName = node.callee.callee.name;
   } else {
     callName = node.callee.name;
   }
-  return callName == name ? true : false;
+  return callName;
 }
+
+const isCallExpressionNamed = (node: ESTree.CallExpression, name: string | RegExp) => {
+  const callName = getCallExpressionName(node);
+  return callName.match(name) ? true : false;
+}
+
+const isCapitalized = (str: string | undefined) => str == null ? false : str[0] === str[0].toUpperCase();
 
 // styled in JS uses a double invocation like styled('div')({..}) in dart it only uses 1 with some named params so lets fix that.
 function formatStyledCallExpression(node: ESTree.CallExpression, state: State) {
@@ -124,7 +144,7 @@ function formatNamedArgs(args: Record<string, ESTree.Node> = {}, state: State) {
 
 function formatComments(
   state: State,
-  comments: any[],
+  comments: ESTree.Comment[],
   indent: string,
   lineEnd: string,
 ) {
@@ -149,9 +169,39 @@ function formatComments(
   }
 }
 
-const formatVariableDeclaration: CustomGenerator['VariableDeclaration'] = (
+const formatHookDeclarator = (
+  node: ESTree.VariableDeclarator,
+  state: State,
+) => {
+  const hookType = getHookTypeFromDeclarator(node);
+  if (hookType != null) {
+    if (hookType == 'State') {
+      // using destructured assignment
+      // ex. `const [state, setState] = useState();`
+      if (node.id.type == 'ArrayPattern' && node.id.elements.length == 2) {
+          // Add to a hook map the identifier name so that when that identifier is found later we can swap it with the overreact equivalent
+          if (node.id.elements[0].type == 'Identifier' && node.id.elements[1].type == 'Identifier') {
+            // First element is the value
+            state.hookIdentifiers[state.currentFunctionComponentName][node.id.elements[0].name] = `${node.id.elements[0].name}.value`;
+            // Second element is the setter
+            state.hookIdentifiers[state.currentFunctionComponentName][node.id.elements[1].name] = `${node.id.elements[0].name}.set`;
+            state.write(node.id.elements[0].name, node);
+          }
+        } else {
+          state.generator[node.id.type](node.id, state);
+        }
+    }
+    if (node.init != null) {
+      state.write(' = ');
+      state.generator[node.init.type](node.init, state);
+    }
+  }
+}
+
+
+const formatVariableDeclaration = (
   node: ESTree.VariableDeclaration,
-  state,
+  state: State,
 ) => {
   /*
     Writes into `state` a variable declaration.
@@ -168,6 +218,10 @@ const formatVariableDeclaration: CustomGenerator['VariableDeclaration'] = (
   state.write(' ');
   const { length } = declarations;
   if (length > 0) {
+    if (isHookDeclarator(declarations[0])) {
+      formatHookDeclarator(declarations[0], state);
+      return;
+    }
     generator.VariableDeclarator(declarations[0], state);
     for (let i = 1; i < length; i++) {
       state.write(', ');
@@ -176,9 +230,28 @@ const formatVariableDeclaration: CustomGenerator['VariableDeclaration'] = (
   }
 };
 
-const formatJSXElement: CustomGenerator['JSXElement'] = (
-  node,
-  state,
+const isHookDeclarator = (node: ESTree.VariableDeclarator) => {
+  if (node.init != null && node.init?.type == 'CallExpression') {
+    return getCallExpressionName(node.init).startsWith('use');
+  }
+  return false;
+}
+
+const getHookTypeFromDeclarator = (node: ESTree.VariableDeclarator) => {
+  if (node.init != null && node.init?.type == 'CallExpression') {
+    let callName = getCallExpressionName(node.init);
+    if (callName.startsWith('use')) {
+      callName = callName.substring(3);
+    }
+    return callName;
+  }
+  return null;
+}
+
+
+const formatJSXElement = (
+  node: ESTree.JSXElement,
+  state: State,
 ) => {
   const indent = state.indent.repeat(state.indentLevel++);
   const jsxElementIndent = indent + state.indent;
@@ -228,9 +301,9 @@ const formatJSXElement: CustomGenerator['JSXElement'] = (
   state.indentLevel--;
 };
 
-const formatJSXFragment: CustomGenerator['JSXFragment'] = (
+const formatJSXFragment = (
   node: ESTree.JSXFragment,
-  state,
+  state: State,
 ) => {
   const indent = state.indent.repeat(state.indentLevel++);
   const jsxElementIndent = indent + state.indent;
@@ -255,12 +328,12 @@ const formatJSXFragment: CustomGenerator['JSXFragment'] = (
   state.indentLevel--;
 };
 
-const formatJSXAttribute: CustomGenerator['JSXAttribute'] = (
+const formatJSXAttribute = (
   node: ESTree.JSXAttribute,
-  state,
+  state: State,
 ) => {
   state.write('..', node);
-  // @ts-ignore
+  // @ts-ignore `node.name` is having type issues but because we are passing it to state.generator of the node.type there will be no issue.
   state.generator[node.name.type](node.name, state);
   state.write(' = ', node);
   if (node.value != null) {
@@ -271,9 +344,9 @@ const formatJSXAttribute: CustomGenerator['JSXAttribute'] = (
   }
 };
 
-const formatJSXSpreadAttribute: CustomGenerator['JSXSpreadAttribute'] = (
+const formatJSXSpreadAttribute = (
   node: ESTree.JSXSpreadAttribute,
-  state,
+  state: State,
 ) => {
   state.write('..addProps(');
   state.generator[node.argument.type](node, state);
@@ -336,80 +409,110 @@ function isString(value: unknown): value is string {
 }
 
 // Unrelated but kind dope (found while building this): https://jsonformatter.org/json-to-dart
-const customGenerator: CustomGenerator = {
+const customGenerator = {
   ...GENERATOR,
+  Program(node: ESTree.Program, state: State) {
+    // Initialize state with hooks placeholder
+    state.hookIdentifiers = {};
+    const indent = state.indent.repeat(state.indentLevel);
+    const { lineEnd, writeComments } = state;
+    if (writeComments && node.comments != null) {
+      formatComments(state, node.comments, indent, lineEnd);
+    }
+    const statements = node.body;
+    const { length } = statements;
+    for (let i = 0; i < length; i++) {
+      const statement = statements[i];
+      if (writeComments && statement.comments != null) {
+        formatComments(state, statement.comments, indent, lineEnd);
+      }
+      state.write(indent);
+      state.generator[statement.type](statement, state);
+      state.write(lineEnd);
+    }
+    if (writeComments && node.trailingComments != null) {
+      formatComments(state, node.trailingComments, indent, lineEnd);
+    }
+  },
   JSXElement: formatJSXElement,
   JSXFragment: formatJSXFragment,
   JSXAttribute: formatJSXAttribute,
   JSXSpreadAttribute: formatJSXSpreadAttribute,
-  JSXIdentifier: function (node: ESTree.JSXIdentifier, state) {
+  JSXIdentifier: function (node: ESTree.JSXIdentifier, state: State) {
     if (node.name.includes('aria-')) {
       state.write(node.name.replace('aria-', 'aria.'));
       return;
     }
-    this.Identifier(node, state);
+    state.generator.Identifier(node, state);
   },
-  JSXMemberExpression: function (node: ESTree.JSXMemberExpression, state) {
-    this.MemberExpression(node, state);
+  JSXMemberExpression: function (node: ESTree.JSXMemberExpression, state: State) {
+    state.generator.MemberExpression(node, state);
   },
-  JSXNamespacedName: function (node: ESTree.JSXNamespacedName, state) {
-    // @ts-ignore this hasn't come up yet...
-    this[node.namespace.type](node.namespace, state);
-    this[node.name.type](node.name, state);
+  JSXNamespacedName: function (node: ESTree.JSXNamespacedName, state: State) {
+    // @ts-ignore this isn't an issue because we are sending it tot the exact type it needs
+    state.generator[node.namespace.type](node.namespace, state);
+    state.generator[node.name.type](node.name, state);
   },
-  JSXExpressionContainer: function (node, state) {
-    this[node.expression.type](node.expression, state);
+  JSXExpressionContainer: function (node: ESTree.JSXExpressionContainer, state: State) {
+    state.generator[node.expression.type](node.expression, state);
   },
-  JSXText: function (node, state) {
+  JSXText: function (node: ESTree.JSXText, state: State) {
     if (node.value == null) {
       return;
     }
     state.write(`'${node.value.trim()}'`);
   },
-  Literal: function (node, state) {
+  Literal: (node: ESTree.Literal, state: State) => {
     if (node.raw != null) {
       // Non-standard property
       state.write(node.raw, node);
-    } else if (node.regex != null) {
-      this.RegExpLiteral(node, state);
-    } else if (node.bigint != null) {
-      state.write(node.bigint + 'n', node);
+    } else if (node.value == 'regex') {
+      state.generator.RegExpLiteral(node, state);
+    } else if (node.value == 'bigint') {
+      state.write(node.value + 'n', node);
     } else {
       state.write(JSON.stringify(node.value).replaceAll('"', '\''), node);
     }
   },
+  Identifier: (node: ESTree.Identifier, state: State) => {
+    // Check if this identifier is a known hook and replace it
+    if (
+      specialFeatures.or_hooks
+      && state.hookIdentifiers[state.currentFunctionComponentName][node.name] != null
+      && ((node?.start ?? 0) >= state.currentFunctionComponentRange[0])
+      && ((node?.end ?? 0) <= state.currentFunctionComponentRange[1])
+    ) {
+      state.write(state.hookIdentifiers[state.currentFunctionComponentName][node.name], node);
+    } else {
+      state.write(node.name, node);
+    }
+  },
 
-  Property: function (
-    node:
-      | (ESTree2.AssignmentProperty & {
-        type: 'Property';
-      })
-      | (ESTree.Property & {
-        type: 'Property';
-      }),
-    state,
-  ) {
+  Property: (
+    node: ESTree.Property,
+    state: State,
+  ) => {
     if (node.method || node.kind[0] !== 'i') {
       // Either a method or of kind `set` or `get` (not `init`)
-      this.MethodDefinition(node, state);
+      state.generator.MethodDefinition(node, state);
     } else {
       if (!node.shorthand) {
         if (node.computed) {
           state.write('[');
-          this[node.key.type](node.key, state);
+          state.generator[node.key.type](node.key, state);
           state.write(']');
         } else {
           if (node.key.type == 'Identifier') state.write('\'');
-          this[node.key.type](node.key, state);
+          state.generator[node.key.type](node.key, state);
           if (node.key.type == 'Identifier') state.write('\'');
         }
         state.write(': ');
       }
 
-      this[node.value.type](node.value, state);
+      state.generator[node.value.type](node.value, state);
     }
   },
-  ObjectExpression: function (node: ESTree.ObjectExpression, state) {
+  ObjectExpression: (node: ESTree.ObjectExpression, state: State) => {
     const indent = state.indent.repeat(state.indentLevel++);
     const { lineEnd } = state;
     const propertyIndent = indent + state.indent;
@@ -428,7 +531,7 @@ const customGenerator: CustomGenerator = {
           formatComments(state, property.comments, propertyIndent, lineEnd);
         }
         state.write(propertyIndent);
-        this[property.type](property, state);
+        state.generator[property.type](property, state);
         if (++i < length) {
           state.write(comma);
         } else {
@@ -436,35 +539,35 @@ const customGenerator: CustomGenerator = {
         }
       }
       state.write(lineEnd);
-      // if (writeComments && node.trailingComments != null) {
-      //   formatComments(state, node.trailingComments, propertyIndent, lineEnd);
-      // }
+      if (writeComments && node.trailingComments != null) {
+        formatComments(state, node.trailingComments, propertyIndent, lineEnd);
+      }
       state.write(indent + '}');
-    } // else if (writeComments) {
-    //   if (node.comments != null) {
-    //     state.write(lineEnd);
-    //     formatComments(state, node.comments, propertyIndent, lineEnd);
-    //     if (node.trailingComments != null) {
-    //       formatComments(state, node.trailingComments, propertyIndent, lineEnd);
-    //     }
-    //     state.write(indent + '}');
-    //   } else if (node.trailingComments != null) {
-    //     state.write(lineEnd);
-    //     formatComments(state, node.trailingComments, propertyIndent, lineEnd);
-    //     state.write(indent + '}');
-    //   } else {
-    //     state.write('}');
-    //   }
-    // } else {
+    } else if (writeComments) {
+      if (node.comments != null) {
+        state.write(lineEnd);
+        formatComments(state, node.comments, propertyIndent, lineEnd);
+        if (node.trailingComments != null) {
+          formatComments(state, node.trailingComments, propertyIndent, lineEnd);
+        }
+        state.write(indent + '}');
+      } else if (node.trailingComments != null) {
+        state.write(lineEnd);
+        formatComments(state, node.trailingComments, propertyIndent, lineEnd);
+        state.write(indent + '}');
+      } else {
+        state.write('}');
+      }
+    } else {
       state.write('}');
-    // }
+    }
     state.indentLevel--;
   },
-  RegExpLiteral: function (node, state) {
+  RegExpLiteral: function (node: ESTree.RegExpLiteral, state: State) {
     const { regex } = node;
     state.write(`/${regex.pattern}/${regex.flags}`, node);
   },
-  ArrowFunctionExpression: function (node, state) {
+  ArrowFunctionExpression: (node: ESTree.ArrowFunctionExpression, state: State) => {
     const { params } = node;
     if (params != null) {
       formatSequence(node.params, state);
@@ -477,13 +580,13 @@ const customGenerator: CustomGenerator = {
     if (node.body.type[0] === 'O') {
       // Body is an object expression
       state.write('(');
-      this.ObjectExpression(node.body, state);
+      state.generator.ObjectExpression(node.body, state);
       state.write(')');
     } else {
-      this[node.body.type](node.body, state);
+      state.generator[node.body.type](node.body, state);
     }
   },
-  ArrayExpression: function (node: ESTree.ArrayExpression, state) {
+  ArrayExpression: (node: ESTree.ArrayExpression, state: State) => {
     state.write('[');
     if (node.elements.length > 0) {
       const { elements } = node,
@@ -491,7 +594,7 @@ const customGenerator: CustomGenerator = {
       for (let i = 0;;) {
         const element = elements[i];
         if (element != null) {
-          this[element.type](element, state);
+          state.generator[element.type](element, state);
         }
         if (++i < length) {
           state.write(', ');
@@ -505,16 +608,12 @@ const customGenerator: CustomGenerator = {
     }
     state.write(']');
   },
-  ArrayPattern: function (node, state) {
-    if (node.elements.length == 2 && node.elements[1].name.includes('set')) {
-      this[node.elements[0].type](node.elements[0], state);
-    } else {
-      state.generator.ArrayExpression(node, state);
-    }
+ArrayPattern: (node: ESTree.ArrayPattern, state: State) => {
+    state.generator.ArrayExpression(node, state);
   },
-  CallExpression: function (node, state) {
+CallExpression: (node: ESTree.CallExpression, state: State) => {
     // Special Case
-    if (isCallExpressionNamed(node, 'styled')) {
+    if (specialFeatures.or_styled && isCallExpressionNamed(node, 'styled')) {
       formatStyledCallExpression(node, state);
       return;
     }
@@ -524,17 +623,25 @@ const customGenerator: CustomGenerator = {
       precedence < state.expressionsPrecedence.CallExpression
     ) {
       state.write('(');
-      this[node.callee.type](node.callee, state);
+      state.generator[node.callee.type](node.callee, state);
       state.write(')');
     } else {
-      this[node.callee.type](node.callee, state);
+      state.generator[node.callee.type](node.callee, state);
     }
     if (node.optional) {
       state.write('?.');
     }
     formatSequence(node['arguments'], state);
   },
-  FunctionDeclaration: function (node: ESTree.FunctionDeclaration, state: State) {
+  FunctionDeclaration: (node: ESTree.FunctionDeclaration, state: State) => {
+    if (node.id != null && isCapitalized(node.id.name)) {
+      if (node.start != null && node.end != null) {
+        state.currentFunctionComponentRange = [node.start, node.end];
+      }
+      state.currentFunctionComponentName = node.id.name;
+      state.hookIdentifiers[state.currentFunctionComponentName] = {};
+      console.log(state.currentFunctionComponentName);
+    }
     state.write(
       (node.id ? node.id.name : '') +
         (node.async ? 'async' : '') +
@@ -543,16 +650,16 @@ const customGenerator: CustomGenerator = {
     );
     formatSequence(node.params, state);
     state.write(' ');
-    if (node.body != null) this[node.body.type](node.body, state);
+    if (node.body != null) state.generator[node.body.type](node.body, state);
   },
-  VariableDeclarator: function (node, state) {
-    this[node.id.type](node.id, state);
+VariableDeclarator: (node: ESTree.VariableDeclarator, state: State) => {
+    state.generator[node.id.type](node.id, state);
     if (node.init != null) {
       state.write(' = ');
-      this[node.init.type](node.init, state);
+      state.generator[node.init.type](node.init, state);
     }
   },
-  VariableDeclaration: function (node, state) {
+VariableDeclaration: (node: ESTree.VariableDeclaration, state: State) => {
     formatVariableDeclaration(node, state);
     state.write(';');
   },
@@ -560,7 +667,47 @@ const customGenerator: CustomGenerator = {
 
 export function jsx2OverReact(str: string): string {
   const comments: ESTree.Comment[] = [];
-  const ast = parseScript(str, { module: true, jsx: true, onComment: comments });
+  // Create a Program with an in-memory emit
+  // const createdFiles: Record<string, string> = {};
+  // const host = ts.createCompilerHost( {module: ts.ModuleKind.CommonJS, allowJs:true });
+  // host.writeFile = (fileName: string, contents: string) => createdFiles[fileName] = contents
+  const filename = "test.ts";
+const sourceFile = ts.createSourceFile(
+    filename, str, ts.ScriptTarget.Latest
+);
+
+const defaultCompilerHost = ts.createCompilerHost({});
+
+const customCompilerHost: ts.CompilerHost = {
+    getSourceFile: (name, languageVersion) => {
+        console.log(`getSourceFile ${name}`);
+
+        if (name === filename) {
+            return sourceFile;
+        } else {
+            return defaultCompilerHost.getSourceFile(
+                name, languageVersion
+            );
+        }
+    },
+    writeFile: (filename, data) => {},
+    getDefaultLibFileName: () => "lib.d.ts",
+    useCaseSensitiveFileNames: () => false,
+    getCanonicalFileName: filename => filename,
+    getCurrentDirectory: () => "",
+    getNewLine: () => "\n",
+    getDirectories: () => [],
+    fileExists: () => true,
+    readFile: () => ""
+};
+
+const program = ts.createProgram(
+    ["test.ts"], {}, customCompilerHost
+);
+const typeChecker = program.getTypeChecker();
+  const transpiler = new ts2dart.Transpiler();
+  console.log(transpiler.translateProgram(program, customCompilerHost))
+  const ast = parseScript(str, { module: true, jsx: true, ranges: true, onComment: comments });
   attachComments(ast, comments);
   console.log(ast);
   return generate(ast, { generator: customGenerator });
@@ -585,7 +732,7 @@ const skipNodes = new Set([
 function attachComments(ast: ESTree.Program, comments: ESTree.Comment[]) {
   const nodePositions    = Array(ast.end).fill(null)
   const commentPositions = Array(ast.end).fill(null)
-
+  // @ts-expect-error idk man...
   walk(ast, {
     enter(node: any, parent: any, prop: any, index: any) {
       if (skipNodes.has(node.type))
