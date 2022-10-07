@@ -10,7 +10,6 @@ import {
   NEEDS_PARENTHESES,
 } from 'https://deno.land/x/astring@v1.8.3/src/astring.js';
 import { Generator, State } from 'https://deno.land/x/astring@v1.8.3/astring.d.ts';
-import ts from 'https://esm.sh/v96/typescript@4.8.4/lib/typescript.d.ts';
 
 declare module 'https://deno.land/x/astring@v1.8.3/astring.d.ts' {
   interface State {
