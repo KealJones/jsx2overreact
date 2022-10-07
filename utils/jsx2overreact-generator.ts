@@ -85,11 +85,9 @@ function reindent(state: State, text: string, indent: string, lineEnd: string) {
 }
 
 const getCallExpressionName = (node: ESTree.CallExpression): string => {
-  let callName;
+  let callName = node.callee?.name ?? '';
   if (node.callee.type == 'CallExpression') {
     callName = node.callee.callee.name;
-  } else {
-    callName = node.callee.name;
   }
   return callName;
 }
@@ -477,7 +475,7 @@ const customGenerator = {
     // Check if this identifier is a known hook and replace it
     if (
       specialFeatures.or_hooks
-      && state.hookIdentifiers[state.currentFunctionComponentName][node.name] != null
+      && state.hookIdentifiers[state.currentFunctionComponentName]?.[node.name] != null
       && ((node?.start ?? 0) >= state.currentFunctionComponentRange[0])
       && ((node?.end ?? 0) <= state.currentFunctionComponentRange[1])
     ) {
